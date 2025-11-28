@@ -80,9 +80,10 @@ export class GlovoService {
     });
 
     // Update internal order status if needed
-    if (mockStatus === 'DELIVERED' && glovoOrder.order.status !== 'COMPLETED') {
-      // This would be handled by webhook in real implementation
-    }
+    // Note: In real implementation, this would be handled by webhook
+    // if (mockStatus === 'DELIVERED' && glovoOrder.order.status !== 'COMPLETED') {
+    //   // Update order status
+    // }
 
     return updatedGlovoOrder;
   }

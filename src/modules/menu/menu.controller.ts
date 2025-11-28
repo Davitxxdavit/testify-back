@@ -138,7 +138,7 @@ export class MenuController {
     },
   })
   @ApiOperation({ summary: 'Upload menu item image (Admin only)' })
-  async uploadImage(@UploadedFile() file: Express.Multer.File) {
+  async uploadImage(@UploadedFile() file: any) {
     return {
       url: `/uploads/menu/${file.filename}`,
       filename: file.filename,

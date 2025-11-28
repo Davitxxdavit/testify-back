@@ -15,14 +15,20 @@ import { GlovoModule } from '../modules/glovo/glovo.module';
     GlovoModule,
     BullModule.forRootAsync({
       imports: [ConfigModule],
-      useFactory: async (configService: ConfigService) => ({
-        connection: {
-          host: configService.get<string>('redis.host'),
-          port: configService.get<number>('redis.port'),
+      useFactory: async (configService: ConfigService) => {
+        const redisConfig = {
+          host: configService.get<string>('redis.host') || 'localhost',
+          port: configService.get<number>('redis.port') || 6379,
           password: configService.get<string>('redis.password'),
-          db: configService.get<number>('redis.db'),
-        },
-      }),
+          db: configService.get<number>('redis.db') || 0,
+          maxRetriesPerRequest: null,
+          retryStrategy: () => null, // Disable retry to prevent connection loops
+        };
+        
+        return {
+          connection: redisConfig,
+        };
+      },
       inject: [ConfigService],
     }),
     BullModule.registerQueue(

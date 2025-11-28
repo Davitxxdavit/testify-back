@@ -27,10 +27,14 @@ import { HealthModule } from './health/health.module';
     }),
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],
-      useFactory: (configService: ConfigService) => ({
-        ttl: configService.get<number>('throttle.ttl') || 60,
-        limit: configService.get<number>('throttle.limit') || 100,
-      }),
+      useFactory: (configService: ConfigService) => {
+        return {
+          throttlers: [{
+            ttl: configService.get<number>('throttle.ttl') || 60,
+            limit: configService.get<number>('throttle.limit') || 100,
+          }],
+        };
+      },
       inject: [ConfigService],
     }),
     PrismaModule,
