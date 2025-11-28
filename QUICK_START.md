@@ -59,3 +59,4 @@ When deploying to Render:
 3. Update `DATABASE_URL` in Render environment variables
 4. Run migrations: `npx prisma migrate deploy`
 
+
