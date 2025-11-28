@@ -74,8 +74,8 @@ export class OrdersService {
       totalPrice += itemTotal;
     }
 
-    // Create order
-    const order = await this.prisma.$transaction(async (tx) => {
+    // Create order with retry logic for deadlocks
+    const order = await this.prisma.executeWithRetry(async (tx) => {
       const newOrder = await tx.order.create({
         data: {
           userId,
@@ -257,7 +257,7 @@ export class OrdersService {
       );
     }
 
-    const updatedOrder = await this.prisma.$transaction(async (tx) => {
+    const updatedOrder = await this.prisma.executeWithRetry(async (tx) => {
       const order = await tx.order.update({
         where: { id: orderId },
         data: { status: updateStatusDto.status },

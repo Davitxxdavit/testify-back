@@ -34,12 +34,57 @@ import { GlovoModule } from '../modules/glovo/glovo.module';
     BullModule.registerQueue(
       {
         name: 'scheduledOrders',
+        defaultJobOptions: {
+          attempts: 3,
+          backoff: {
+            type: 'exponential',
+            delay: 2000,
+          },
+          removeOnComplete: {
+            count: 1000,
+            age: 24 * 3600, // 24 hours
+          },
+          removeOnFail: {
+            count: 5000,
+            age: 7 * 24 * 3600, // 7 days
+          },
+        },
       },
       {
         name: 'notifications',
+        defaultJobOptions: {
+          attempts: 3,
+          backoff: {
+            type: 'exponential',
+            delay: 1000,
+          },
+          removeOnComplete: {
+            count: 500,
+            age: 24 * 3600, // 24 hours
+          },
+          removeOnFail: {
+            count: 1000,
+            age: 7 * 24 * 3600, // 7 days
+          },
+        },
       },
       {
         name: 'glovoSync',
+        defaultJobOptions: {
+          attempts: 5,
+          backoff: {
+            type: 'exponential',
+            delay: 3000,
+          },
+          removeOnComplete: {
+            count: 500,
+            age: 24 * 3600, // 24 hours
+          },
+          removeOnFail: {
+            count: 2000,
+            age: 7 * 24 * 3600, // 7 days
+          },
+        },
       },
     ),
   ],

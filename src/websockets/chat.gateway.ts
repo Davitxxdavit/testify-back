@@ -16,16 +16,25 @@ import { NotificationsService } from '../modules/notifications/notifications.ser
 import { CurrentUserPayload } from '../common/decorators/current-user.decorator';
 
 @WebSocketGateway({
-  cors: {
-    origin: '*',
+  cors: (origin, callback) => {
+    // CORS will be handled dynamically in handleConnection
+    callback(null, true);
   },
   namespace: '/chat',
+  maxHttpBufferSize: 10 * 1024, // 10KB message size limit
 })
 export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
 
   private readonly logger = new Logger(ChatGateway.name);
+  private readonly allowedOrigins: string[];
+  private readonly maxConnectionsPerUser = 5;
+  private readonly userConnections = new Map<string, Set<string>>();
+  private readonly connectionRateLimit = new Map<string, number>();
+  private readonly rateLimitWindow = 1000;
+  private readonly maxMessagesPerWindow = 10;
+  private heartbeatInterval: NodeJS.Timeout | null = null;
 
   constructor(
     private jwtService: JwtService,
@@ -34,10 +43,64 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private notificationsService: NotificationsService,
   ) {
     this.notificationsService.setChatGateway(this);
+    
+    // Setup allowed origins based on environment
+    const nodeEnv = this.configService.get<string>('nodeEnv') || 'development';
+    const frontendUrl = this.configService.get<string>('frontendUrl') || '';
+    
+    this.allowedOrigins = nodeEnv === 'production'
+      ? frontendUrl.split(',').filter(Boolean)
+      : ['http://localhost:3001', 'http://localhost:3000', 'http://127.0.0.1:3001', 'http://127.0.0.1:3000'];
+
+    this.setupHeartbeat();
+  }
+
+  private setupHeartbeat() {
+    this.heartbeatInterval = setInterval(() => {
+      this.server.emit('ping', { timestamp: Date.now() });
+    }, 30000);
+  }
+
+  private checkRateLimit(socketId: string): boolean {
+    const now = Date.now();
+    const lastMessage = this.connectionRateLimit.get(socketId) || 0;
+    const messagesInWindow = Math.floor((now - lastMessage) / this.rateLimitWindow);
+
+    if (messagesInWindow >= this.maxMessagesPerWindow) {
+      return false;
+    }
+
+    this.connectionRateLimit.set(socketId, now);
+    return true;
+  }
+
+  private checkConnectionLimit(userId: string, socketId: string): boolean {
+    const connections = this.userConnections.get(userId) || new Set();
+    
+    if (connections.size >= this.maxConnectionsPerUser) {
+      const oldestSocketId = Array.from(connections)[0];
+      const socket = this.server.sockets.sockets.get(oldestSocketId);
+      if (socket) {
+        socket.disconnect();
+        connections.delete(oldestSocketId);
+      }
+    }
+
+    connections.add(socketId);
+    this.userConnections.set(userId, connections);
+    return true;
   }
 
   async handleConnection(client: Socket) {
     try {
+      // Validate origin
+      const origin = client.handshake.headers.origin;
+      if (origin && !this.allowedOrigins.includes(origin)) {
+        this.logger.warn(`Client ${client.id} connected from disallowed origin: ${origin}`);
+        client.disconnect();
+        return;
+      }
+
       const token = client.handshake.auth?.token || client.handshake.headers?.authorization?.replace('Bearer ', '');
       
       if (!token) {
@@ -73,15 +136,36 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         user = { id: staff.id, phone: staff.phone, role: staff.role, type: 'staff' };
       }
 
+      if (!this.checkConnectionLimit(user.id, client.id)) {
+        this.logger.warn(`Connection limit reached for user ${user.id}`);
+        client.disconnect();
+        return;
+      }
+
       client.data.user = user;
       this.logger.log(`Chat client ${client.id} connected as ${type}: ${user.id}`);
-    } catch (error) {
+
+      client.on('pong', () => {
+        // Client responded to ping
+      });
+    } catch (error: any) {
       this.logger.error(`Chat connection error: ${error.message}`);
       client.disconnect();
     }
   }
 
   handleDisconnect(client: Socket) {
+    const user: CurrentUserPayload = client.data.user;
+    if (user) {
+      const connections = this.userConnections.get(user.id);
+      if (connections) {
+        connections.delete(client.id);
+        if (connections.size === 0) {
+          this.userConnections.delete(user.id);
+        }
+      }
+      this.connectionRateLimit.delete(client.id);
+    }
     this.logger.log(`Chat client ${client.id} disconnected`);
   }
 
@@ -90,6 +174,14 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @MessageBody() data: { orderId: string; message: string },
     @ConnectedSocket() client: Socket,
   ) {
+    if (!this.checkRateLimit(client.id)) {
+      return { error: 'Rate limit exceeded' };
+    }
+
+    if (JSON.stringify(data).length > 10 * 1024) {
+      return { error: 'Message too large' };
+    }
+
     const user: CurrentUserPayload = client.data.user;
     if (!user) {
       return { error: 'Unauthorized' };
@@ -139,6 +231,10 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @MessageBody() data: { orderId: string },
     @ConnectedSocket() client: Socket,
   ) {
+    if (!this.checkRateLimit(client.id)) {
+      return { error: 'Rate limit exceeded' };
+    }
+
     const user: CurrentUserPayload = client.data.user;
     if (!user) {
       return { error: 'Unauthorized' };
@@ -167,6 +263,10 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @MessageBody() data: { orderId: string; limit?: number; offset?: number },
     @ConnectedSocket() client: Socket,
   ) {
+    if (!this.checkRateLimit(client.id)) {
+      return { error: 'Rate limit exceeded' };
+    }
+
     const user: CurrentUserPayload = client.data.user;
     if (!user) {
       return { error: 'Unauthorized' };

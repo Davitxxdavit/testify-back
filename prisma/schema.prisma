@@ -190,6 +190,10 @@ model Order {
   @@index([paymentStatus])
   @@index([createdAt])
   @@index([scheduledFor])
+  @@index([userId, status])
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+  @@index([paymentStatus, createdAt])
   @@map("orders")
 }
 
@@ -273,6 +277,7 @@ model Chat {
 
   @@index([orderId])
   @@index([sentAt])
+  @@index([orderId, sentAt])
   @@map("chats")
 }
 

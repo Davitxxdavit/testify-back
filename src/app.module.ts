@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import configuration from './config/configuration';
+import { configValidationSchema } from './config/config.schema';
 import { PrismaModule } from './database/prisma.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
@@ -17,6 +18,8 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { WebSocketModule } from './websockets/websocket.module';
 import { QueueModule } from './queues/queue.module';
 import { HealthModule } from './health/health.module';
+import { CommonModule } from './common/common.module';
+import { MetricsModule } from './metrics/metrics.module';
 
 @Module({
   imports: [
@@ -24,6 +27,11 @@ import { HealthModule } from './health/health.module';
       isGlobal: true,
       load: [configuration],
       envFilePath: ['.env.local', '.env'],
+      validationSchema: configValidationSchema,
+      validationOptions: {
+        allowUnknown: true,
+        abortEarly: false,
+      },
     }),
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],
@@ -52,6 +60,8 @@ import { HealthModule } from './health/health.module';
     WebSocketModule,
     QueueModule,
     HealthModule,
+    CommonModule,
+    MetricsModule,
   ],
 })
 export class AppModule {}

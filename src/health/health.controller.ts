@@ -10,9 +10,21 @@ export class HealthController {
   constructor(private readonly healthService: HealthService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Health check' })
+  @ApiOperation({ summary: 'Liveness check - basic app health' })
   async check() {
     return this.healthService.check();
+  }
+
+  @Get('live')
+  @ApiOperation({ summary: 'Liveness probe for Kubernetes/Docker' })
+  async liveness() {
+    return this.healthService.check();
+  }
+
+  @Get('ready')
+  @ApiOperation({ summary: 'Readiness probe - checks all dependencies' })
+  async readiness() {
+    return this.healthService.checkReady();
   }
 
   @Get('db')

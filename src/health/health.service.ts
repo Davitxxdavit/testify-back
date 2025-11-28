@@ -35,6 +35,7 @@ export class HealthService {
     }
   }
 
+  // Liveness check - basic app is running
   async check() {
     return {
       status: 'ok',
@@ -42,20 +43,65 @@ export class HealthService {
     };
   }
 
+  // Readiness check - app is ready to serve traffic
+  async checkReady() {
+    const startTime = Date.now();
+    const checks: any = {
+      database: await this.checkDatabaseWithTime(),
+      redis: await this.checkRedisWithTime(),
+    };
+
+    const totalTime = Date.now() - startTime;
+    const allHealthy = Object.values(checks).every(
+      (check: any) => check.status === 'ok' || check.status === 'warning',
+    );
+
+    return {
+      status: allHealthy ? 'ok' : 'error',
+      checks,
+      responseTime: `${totalTime}ms`,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
   async checkDatabase() {
     try {
+      const startTime = Date.now();
       await this.prisma.$queryRaw`SELECT 1`;
+      const responseTime = Date.now() - startTime;
+
       return {
         status: 'ok',
         database: 'connected',
+        responseTime: `${responseTime}ms`,
         timestamp: new Date().toISOString(),
       };
-    } catch (error) {
+    } catch (error: any) {
       return {
         status: 'error',
         database: 'disconnected',
         error: error.message,
         timestamp: new Date().toISOString(),
+      };
+    }
+  }
+
+  private async checkDatabaseWithTime() {
+    try {
+      const startTime = Date.now();
+      await this.prisma.$queryRaw`SELECT 1`;
+      const responseTime = Date.now() - startTime;
+
+      return {
+        status: 'ok',
+        message: 'connected',
+        responseTime: `${responseTime}ms`,
+      };
+    } catch (error: any) {
+      return {
+        status: 'error',
+        message: 'disconnected',
+        error: error.message,
       };
     }
   }
@@ -71,19 +117,51 @@ export class HealthService {
     }
     
     try {
+      const startTime = Date.now();
       await this.redis.ping();
+      const responseTime = Date.now() - startTime;
+
       return {
         status: 'ok',
         redis: 'connected',
+        responseTime: `${responseTime}ms`,
         timestamp: new Date().toISOString(),
       };
-    } catch (error) {
+    } catch (error: any) {
       return {
         status: 'error',
         redis: 'disconnected',
         error: error.message,
         message: 'Redis is optional - app will work without it',
         timestamp: new Date().toISOString(),
+      };
+    }
+  }
+
+  private async checkRedisWithTime() {
+    if (!this.redis) {
+      return {
+        status: 'warning',
+        message: 'not configured',
+        note: 'Redis is optional for basic functionality',
+      };
+    }
+    
+    try {
+      const startTime = Date.now();
+      await this.redis.ping();
+      const responseTime = Date.now() - startTime;
+
+      return {
+        status: 'ok',
+        message: 'connected',
+        responseTime: `${responseTime}ms`,
+      };
+    } catch (error: any) {
+      return {
+        status: 'error',
+        message: 'disconnected',
+        error: error.message,
       };
     }
   }
