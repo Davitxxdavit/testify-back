@@ -53,3 +53,4 @@ export const configValidationSchema = Joi.object({
   SMTP_FROM: Joi.string().optional().allow(''),
 });
 
+

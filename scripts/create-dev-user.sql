@@ -9,3 +9,4 @@ GRANT ALL PRIVILEGES ON DATABASE postgres TO cafeteria_dev;
 -- DATABASE_URL=postgresql://cafeteria_dev:dev123@localhost:5432/cafeteria_burger?schema=public
 
 
+
