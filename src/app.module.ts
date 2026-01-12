@@ -20,6 +20,8 @@ import { QueueModule } from './queues/queue.module';
 import { HealthModule } from './health/health.module';
 import { CommonModule } from './common/common.module';
 import { MetricsModule } from './metrics/metrics.module';
+import { AppController } from './app.controller';
+
 
 @Module({
   imports: [
@@ -63,6 +65,7 @@ import { MetricsModule } from './metrics/metrics.module';
     CommonModule,
     MetricsModule,
   ],
+  controllers: [AppController],
 })
-export class AppModule {}
+export class AppModule { }
 
