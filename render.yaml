@@ -1,0 +1,50 @@
+services:
+  - type: web
+    name: cafeteria-burger-backend
+    env: docker
+    plan: free
+    region: frankfurt
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: API_PREFIX
+        value: api
+      - key: FRONTEND_URL
+        sync: false
+      - key: DATABASE_URL
+        fromDatabase:
+          name: cafeteria-burger-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 24h
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_EXPIRES_IN
+        value: 7d
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: cafeteria-burger-redis
+          property: connectionString
+      - key: THROTTLE_TTL
+        value: 60
+      - key: THROTTLE_LIMIT
+        value: 100
+
+  - type: redis
+    name: cafeteria-burger-redis
+    region: frankfurt
+    plan: free
+    ipAllowList: [] # Allow all internal connections
+
+databases:
+  - name: cafeteria-burger-db
+    databaseName: cafeteria_burger
+    user: cafeteria_user
+    plan: free
+    region: frankfurt

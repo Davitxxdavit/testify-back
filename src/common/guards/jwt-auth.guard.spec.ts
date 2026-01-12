@@ -5,7 +5,10 @@ describe('JwtAuthGuard', () => {
   let guard: JwtAuthGuard;
 
   beforeEach(() => {
-    guard = new JwtAuthGuard();
+    const reflector = {
+      getAllAndOverride: jest.fn(),
+    } as any;
+    guard = new JwtAuthGuard(reflector);
   });
 
   it('should be defined', () => {
