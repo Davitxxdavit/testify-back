@@ -1,5 +1,8 @@
 FROM node:18-alpine AS builder
 
+# Install OpenSSL for Prisma
+RUN apk add --no-cache openssl libc6-compat
+
 WORKDIR /app
 
 # Copy package files
@@ -20,6 +23,9 @@ RUN npm run build
 
 # Production stage
 FROM node:18-alpine AS production
+
+# Install OpenSSL for Prisma
+RUN apk add --no-cache openssl libc6-compat
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs && \
