@@ -1,5 +1,6 @@
 import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
+import { execSync } from 'child_process';
 
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
@@ -31,11 +32,28 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   }
 
   async onModuleInit() {
+    // Run migrations before connecting (ensures tables exist)
+    await this.runMigrations();
     await this.connectWithRetry();
   }
 
   async onModuleDestroy() {
     await this.$disconnect();
+  }
+
+  private async runMigrations(): Promise<void> {
+    try {
+      this.logger.log('🔄 Running database migrations...');
+      execSync('npx prisma migrate deploy', {
+        stdio: 'inherit',
+        timeout: 60000, // 60 second timeout
+      });
+      this.logger.log('✅ Database migrations completed successfully');
+    } catch (error) {
+      this.logger.error('❌ Migration failed:', error);
+      // Don't throw - let the app try to connect anyway
+      // Tables might already exist from a previous deployment
+    }
   }
 
   private async connectWithRetry(retries = 0): Promise<void> {
