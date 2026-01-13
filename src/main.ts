@@ -33,10 +33,10 @@ async function bootstrap() {
   // CORS - Environment-based whitelist
   const nodeEnv = configService.get<string>('nodeEnv') || 'development';
   const frontendUrl = configService.get<string>('frontendUrl') || '';
-  
+
   const allowedOrigins = nodeEnv === 'production'
     ? frontendUrl.split(',').filter(Boolean)
-    : ['http://localhost:3001', 'http://localhost:3000', 'http://127.0.0.1:3001', 'http://127.0.0.1:3000'];
+    : ['http://localhost:3001', 'http://localhost:3000', 'http://127.0.0.1:3001', 'http://127.0.0.1:3000', 'http://localhost:5173', 'http://127.0.0.1:5173'];
 
   app.enableCors({
     origin: (origin, callback) => {
@@ -90,7 +90,7 @@ async function bootstrap() {
   const logger = new Logger('Bootstrap');
   logger.log(`Application is running on: http://localhost:${port}/${apiPrefix}/${apiVersion}`);
   logger.log(`Swagger documentation: http://localhost:${port}/${apiPrefix}/${apiVersion}/docs`);
-  
+
   // Graceful shutdown
   process.on('SIGTERM', async () => {
     logger.log('SIGTERM received, shutting down gracefully...');
