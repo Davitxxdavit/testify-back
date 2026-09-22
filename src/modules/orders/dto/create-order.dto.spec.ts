@@ -20,6 +20,23 @@ describe('CreateOrderDto', () => {
     expect(dto.items[0].modifiers[0]).toMatchObject({ modifierId: 3, price: 1.5 });
   });
 
+  it('accepts contact phone, notes and payment method', async () => {
+    const dto = await validate({
+      ...validOrder,
+      paymentMethod: 'CASH',
+      contactPhone: '+995555123456',
+      notes: 'Gate code 1234',
+    });
+    expect(dto).toMatchObject({ paymentMethod: 'CASH', contactPhone: '+995555123456' });
+  });
+
+  it('rejects a non-Georgian mobile number', async () => {
+    const error = await validate({ ...validOrder, contactPhone: '+15551234567' }).catch((e) => e);
+    expect(error.getResponse().message).toContain(
+      'contactPhone must be a Georgian mobile number (+9955XXXXXXXX)',
+    );
+  });
+
   it('rejects an empty cart', async () => {
     await expect(validate({ ...validOrder, items: [] })).rejects.toBeInstanceOf(BadRequestException);
   });

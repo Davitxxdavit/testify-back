@@ -10,10 +10,16 @@ import {
   Min,
   Max,
   ArrayMinSize,
+  IsString,
+  Matches,
+  MaxLength,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
-import { DeliveryType, OrderType } from '@prisma/client';
+import { DeliveryType, OrderType, PaymentMethod } from '@prisma/client';
+
+// Georgian mobile number in E.164: +995 followed by 9 digits starting with 5
+export const GEORGIAN_MOBILE_REGEX = /^\+9955\d{8}$/;
 
 export class OrderItemModifierDto {
   @ApiProperty({ example: 1 })
@@ -73,6 +79,24 @@ export class CreateOrderDto {
   @IsOptional()
   @IsUUID()
   addressId?: string;
+
+  @ApiProperty({ enum: PaymentMethod, example: PaymentMethod.CASH, required: false })
+  @IsOptional()
+  @IsEnum(PaymentMethod)
+  paymentMethod?: PaymentMethod;
+
+  @ApiProperty({ example: '+995555123456', required: false })
+  @IsOptional()
+  @Matches(GEORGIAN_MOBILE_REGEX, {
+    message: 'contactPhone must be a Georgian mobile number (+9955XXXXXXXX)',
+  })
+  contactPhone?: string;
+
+  @ApiProperty({ example: 'Gate code 1234, 3rd floor', required: false })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  notes?: string;
 
   @ApiProperty({ type: [OrderItemDto] })
   @IsArray()
