@@ -35,6 +35,10 @@ services:
         value: 60
       - key: THROTTLE_LIMIT
         value: 100
+      - key: ADMIN_PHONE
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
 
   - type: redis
     name: cafeteria-burger-redis

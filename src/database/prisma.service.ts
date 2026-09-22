@@ -84,20 +84,28 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 
     try {
       // Seed admin user
+      // Credentials come from ADMIN_PHONE / ADMIN_PASSWORD. The built-in
+      // fallback is for local development only and is never used in production.
+      const isProduction = process.env.NODE_ENV === 'production';
+      const adminPhone = process.env.ADMIN_PHONE || '555000001';
+      const adminPassword = process.env.ADMIN_PASSWORD || (isProduction ? undefined : 'admin123');
+
       const existingAdmin = await this.staff.findFirst({ where: { role: 'ADMIN' } });
-      if (!existingAdmin) {
-        const passwordHash = await bcrypt.hash('admin123', 10);
+      if (existingAdmin) {
+        this.logger.log('Admin user already exists');
+      } else if (!adminPassword) {
+        this.logger.warn('No admin user exists and ADMIN_PASSWORD is not set; skipping admin creation');
+      } else {
+        const passwordHash = await bcrypt.hash(adminPassword, 10);
         await this.staff.create({
           data: {
             name: 'Administrator',
-            phone: '555000001',
+            phone: adminPhone,
             role: 'ADMIN',
             passwordHash,
           },
         });
-        this.logger.log('✅ Default admin created! Phone: 555000001, Password: admin123');
-      } else {
-        this.logger.log('Admin user already exists');
+        this.logger.log(`✅ Admin user created (phone: ${adminPhone})`);
       }
 
       // Seed menu data
