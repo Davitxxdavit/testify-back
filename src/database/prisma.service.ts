@@ -2,6 +2,20 @@ import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/commo
 import { PrismaClient } from '@prisma/client';
 import { execSync } from 'child_process';
 import * as bcrypt from 'bcrypt';
+import { seedMenu } from './seed-data';
+
+// Local demo credentials, never created in production
+export const DEMO_CUSTOMER = {
+  name: 'Demo Customer',
+  email: 'demo@tastify.ge',
+  phone: '+995555123456',
+  password: 'demo1234',
+};
+export const DEMO_KITCHEN = {
+  name: 'Kitchen Staff',
+  phone: '555000002',
+  password: 'kitchen123',
+};
 
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
@@ -111,29 +125,64 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       // Seed menu data
       const categoryCount = await this.menuCategory.count();
       if (categoryCount === 0) {
-        const burgers = await this.menuCategory.create({ data: { name: 'Burgers', sortOrder: 1 } });
-        const sides = await this.menuCategory.create({ data: { name: 'Sides', sortOrder: 2 } });
-        const drinks = await this.menuCategory.create({ data: { name: 'Drinks', sortOrder: 3 } });
-
-        await this.menuItem.createMany({
-          data: [
-            { categoryId: burgers.id, name: 'Classic Cheeseburger', description: 'Juicy beef patty with cheddar cheese', price: 12.99, imageUrl: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500', isActive: true },
-            { categoryId: burgers.id, name: 'Bacon BBQ Burger', description: 'Smoky BBQ sauce, crispy bacon', price: 15.49, imageUrl: 'https://images.unsplash.com/photo-1594212699903-ec8a3eca50f5?w=500', isActive: true },
-            { categoryId: burgers.id, name: 'Mushroom Swiss Burger', description: 'Sautéed mushrooms, swiss cheese', price: 14.50, imageUrl: 'https://images.unsplash.com/photo-1550547660-d9450f859349?w=500', isActive: true },
-            { categoryId: burgers.id, name: 'Double Smash Burger', description: 'Two crispy patties, American cheese', price: 16.99, imageUrl: 'https://images.unsplash.com/photo-1586190848861-99aa4a171e90?w=500', isActive: true },
-            { categoryId: sides.id, name: 'Crispy Fries', description: 'Golden, perfectly salted', price: 4.99, imageUrl: 'https://images.unsplash.com/photo-1573080496219-bb080dd4f877?w=500', isActive: true },
-            { categoryId: sides.id, name: 'Onion Rings', description: 'Beer-battered with chipotle dip', price: 5.99, imageUrl: 'https://images.unsplash.com/photo-1639024471283-03518883512d?w=500', isActive: true },
-            { categoryId: drinks.id, name: 'Fresh Lemonade', description: 'House-made with fresh lemons', price: 3.99, imageUrl: 'https://images.unsplash.com/photo-1621263764928-df1444c5e859?w=500', isActive: true },
-            { categoryId: drinks.id, name: 'Craft Cola', description: 'Premium artisan cola', price: 2.99, imageUrl: 'https://images.unsplash.com/photo-1629203851122-3726ecdf080e?w=500', isActive: true },
-          ],
-        });
-        this.logger.log('✅ Sample menu seeded! (4 burgers, 2 sides, 2 drinks)');
+        let itemCount = 0;
+        for (const [index, category] of seedMenu.entries()) {
+          await this.menuCategory.create({
+            data: {
+              name: category.name,
+              sortOrder: index + 1,
+              items: {
+                create: category.items.map(({ modifiers, ...item }) => {
+                  itemCount++;
+                  return { ...item, isActive: true, modifiers: { create: modifiers } };
+                }),
+              },
+            },
+          });
+        }
+        this.logger.log(`✅ Georgian menu seeded (${seedMenu.length} categories, ${itemCount} items)`);
       } else {
         this.logger.log('Menu data already exists');
+      }
+
+      // Demo accounts for local development only
+      if (!isProduction) {
+        await this.seedDemoAccounts();
       }
     } catch (error: any) {
       this.logger.error('❌ Seeding failed:', error?.message);
       // Don't throw - app can still work, just without seed data
+    }
+  }
+
+  private async seedDemoAccounts(): Promise<void> {
+    const existingCustomer = await this.user.findUnique({ where: { email: DEMO_CUSTOMER.email } });
+    if (!existingCustomer) {
+      await this.user.create({
+        data: {
+          name: DEMO_CUSTOMER.name,
+          email: DEMO_CUSTOMER.email,
+          phone: DEMO_CUSTOMER.phone,
+          passwordHash: await bcrypt.hash(DEMO_CUSTOMER.password, 10),
+          addresses: {
+            create: { street: 'Rustaveli Ave 12, apt 7', city: 'Batumi', isDefault: true },
+          },
+        },
+      });
+      this.logger.log(`✅ Demo customer created (${DEMO_CUSTOMER.email})`);
+    }
+
+    const existingKitchen = await this.staff.findUnique({ where: { phone: DEMO_KITCHEN.phone } });
+    if (!existingKitchen) {
+      await this.staff.create({
+        data: {
+          name: DEMO_KITCHEN.name,
+          phone: DEMO_KITCHEN.phone,
+          role: 'KITCHEN',
+          passwordHash: await bcrypt.hash(DEMO_KITCHEN.password, 10),
+        },
+      });
+      this.logger.log(`✅ Demo kitchen staff created (phone: ${DEMO_KITCHEN.phone})`);
     }
   }
 
