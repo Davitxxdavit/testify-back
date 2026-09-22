@@ -1,333 +1,114 @@
-# Cafeteria Burger Backend
+# Tastify API — Restaurant Ordering Backend
 
-A comprehensive NestJS backend for a cafeteria-style burger ordering system with real-time features, scheduled orders, chat functionality, payment processing, and delivery integration.
+REST and WebSocket API for a restaurant ordering app: customer accounts, menu, instant and scheduled orders, live order tracking, customer–staff chat, and courier delivery. It powers the [tastify-front](https://github.com/Davitxxdavit/tastify-front) web app.
 
-## Tech Stack
+Built with **NestJS, PostgreSQL (Prisma), Redis, BullMQ, and Socket.IO**, with 112 unit and end-to-end tests.
 
-- **Framework**: NestJS (Node.js)
-- **Database**: PostgreSQL with Prisma ORM
-- **Cache/PubSub**: Redis
-- **Job Queue**: BullMQ
-- **Real-time**: Socket.io with Redis adapter
-- **Authentication**: JWT (Passport.js)
-- **API Documentation**: Swagger/OpenAPI
-- **Validation**: class-validator, class-transformer
-- **Deployment**: Docker, Render.com compatible
+```mermaid
+flowchart LR
+    web["tastify-front<br/>(React)"] -- "REST /api/v1" --> api["NestJS API"]
+    web -- "Socket.IO<br/>/orders, /chat" --> api
+    api --> pg[("PostgreSQL<br/>Prisma")]
+    api --> redis[("Redis")]
+    redis --> queues["BullMQ workers<br/>scheduled orders,<br/>notifications, Glovo sync"]
+    queues --> pg
+```
 
 ## Features
 
-- ✅ **User Authentication**: JWT-based auth for customers and staff (admin, kitchen, courier roles)
-- ✅ **Menu Management**: Categories, items, modifiers with image upload
-- ✅ **Order System**: Instant and scheduled orders with BullMQ
-- ✅ **Real-time Updates**: WebSocket events for order status and chat
-- ✅ **Chat System**: Real-time customer ↔ staff chat
-- ✅ **Payment Processing**: Stripe/Adyen integration (placeholder structure)
-- ✅ **Glovo Integration**: Delivery integration (mock implementation)
-- ✅ **Internal Delivery**: Courier assignment and tracking
-- ✅ **Admin Panel**: Order management, analytics, user management
-- ✅ **Scheduled Orders**: BullMQ workers for delayed order processing
-- ✅ **Health Checks**: Database and Redis monitoring
+- **Authentication**: JWT access and refresh tokens; separate logins for customers and staff
+- **Roles**: admin, kitchen, and courier staff roles, enforced with guards
+- **Menu**: categories, items, and modifiers, with image upload
+- **Orders**: instant or scheduled orders; scheduled orders are released on time by a BullMQ worker
+- **Live updates**: Socket.IO events for every order status change
+- **Chat**: real-time chat between a customer and staff about an order
+- **Delivery**: courier task assignment and status tracking; Glovo integration is mocked
+- **Payments**: Stripe and Adyen endpoints and webhooks (placeholder integrations)
+- **Admin**: daily sales analytics, user list, order chat history
+- **Operations**: health and readiness checks, Prometheus metrics, rate limiting, Helmet, compression
+- **API docs**: Swagger UI at `/api/docs`
 
-## Project Structure
+## Tech stack
 
-```
-src/
-├── main.ts                    # Application bootstrap
-├── app.module.ts              # Root module
-├── modules/
-│   ├── auth/                 # Authentication (JWT)
-│   ├── users/                # Customer profiles & addresses
-│   ├── staff/                # Staff management
-│   ├── menu/                 # Menu CRUD
-│   ├── orders/               # Order management
-│   ├── payments/             # Payment processing
-│   ├── chat/                 # Chat system
-│   ├── glovo/                # Glovo integration
-│   ├── admin/                # Admin panel APIs
-│   ├── delivery/             # Internal delivery
-│   └── notifications/         # WebSocket event emitter
-├── common/                   # Guards, decorators, interceptors, filters
-├── database/                 # Prisma service
-├── websockets/               # Socket.io gateways
-├── queues/                   # BullMQ processors
-├── health/                   # Health check endpoints
-└── config/                   # Configuration
-```
+| Area | Tools |
+| --- | --- |
+| Framework | NestJS 10, TypeScript |
+| Database | PostgreSQL, Prisma 5 |
+| Cache and queues | Redis, BullMQ |
+| Real time | Socket.IO with Redis adapter |
+| Auth | Passport, JWT, bcrypt |
+| Validation | class-validator, Joi config schema |
+| Testing | Jest, Supertest |
+| Deployment | Docker, Render Blueprint (`render.yaml`) |
 
-## Prerequisites
+## API overview
 
-- Node.js 18+ and npm
-- PostgreSQL 15+
-- Redis 7+
-- Docker & Docker Compose (optional)
+All routes are prefixed with `/api/v1`. The full, interactive list is in Swagger at `/api/docs`.
 
-## Installation
+| Area | Endpoints |
+| --- | --- |
+| Auth | `POST /auth/register`, `POST /auth/login`, `POST /auth/staff/login`, `POST /auth/refresh` |
+| Menu | `GET/POST /menu/categories`, `GET/POST /menu/items`, `POST /menu/items/upload-image`, `GET /menu/items/:itemId/modifiers`, `POST/PUT/DELETE /menu/modifiers` |
+| Orders | `POST /orders`, `GET /orders`, `GET /orders/:id`, `PATCH /orders/:id/cancel`, `PATCH /orders/:id/status`, `GET /orders/admin/all` |
+| Users | `GET /users/profile`, `GET/POST/PUT/DELETE /users/addresses` |
+| Staff | `GET/POST /staff`, `GET/PUT/DELETE /staff/:id` |
+| Chat | `GET /chat/:orderId`, `POST /chat/:orderId` |
+| Delivery | `POST /delivery/tasks/:orderId`, `PATCH /delivery/tasks/:orderId/assign`, `PATCH /delivery/tasks/:orderId/status`, `GET /delivery/tasks`, `GET /delivery/tasks/my` |
+| Payments | `POST /payments/intent`, `POST /payments/webhooks/stripe`, `POST /payments/webhooks/adyen` |
+| Admin | `GET /admin/analytics/daily-sales`, `GET /admin/users`, `GET /admin/chat/:orderId` |
+| Health | `GET /health`, `/health/live`, `/health/ready`, `/health/db`, `/health/redis`, `GET /metrics` |
 
-### 1. Clone the repository
+### WebSocket events
 
-```bash
-git clone <repository-url>
-cd cafeteria-burger-backend
-```
+| Namespace | Client sends | Server sends |
+| --- | --- | --- |
+| `/orders` | `join_order_room` | `order_created`, `order_updated`, `order_cancelled`, `order_ready`, `order_delivering`, `order_completed` |
+| `/chat` | `join_chat_room`, `send_chat_message`, `request_chat_history` | `chat_message`, `chat_history` |
 
-### 2. Install dependencies
+## Run locally
+
+Requires Node.js 18+, plus PostgreSQL and Redis (the included `docker-compose.yml` starts both).
 
 ```bash
 npm install
-```
-
-### 3. Set up environment variables
-
-Copy `.env.example` to `.env` and fill in the values:
-
-```bash
-cp .env.example .env
-```
-
-Required environment variables:
-- `DATABASE_URL`: PostgreSQL connection string
-- `JWT_SECRET`: Secret for JWT tokens
-- `REDIS_HOST`, `REDIS_PORT`: Redis connection details
-- `FRONTEND_URL`: Frontend URL for CORS
-
-### 4. Set up database
-
-```bash
-# Generate Prisma Client
+cp .env.example .env          # then fill in DATABASE_URL and the JWT secrets
+docker compose up -d          # PostgreSQL + Redis
 npm run prisma:generate
-
-# Run migrations
 npm run prisma:migrate
-
-# (Optional) Open Prisma Studio to view data
-npm run prisma:studio
-```
-
-### 5. Start services with Docker Compose
-
-```bash
-docker-compose up -d
-```
-
-This will start PostgreSQL and Redis containers.
-
-### 6. Run the application
-
-```bash
-# Development mode
 npm run start:dev
-
-# Production mode
-npm run build
-npm run start:prod
 ```
 
-The API will be available at `http://localhost:3000/api`
-Swagger documentation: `http://localhost:3000/api/docs`
+The API runs at http://localhost:3000/api/v1 and Swagger at http://localhost:3000/api/docs.
 
-## API Endpoints
+On first start, the app creates an admin account if none exists. Set `ADMIN_PHONE` and `ADMIN_PASSWORD` to choose its credentials; in development they default to `555000001` / `admin123`, and in production no admin is created unless `ADMIN_PASSWORD` is set.
 
-### Authentication
-- `POST /api/auth/register` - Register new user
-- `POST /api/auth/login` - User login
-- `POST /api/auth/staff/login` - Staff login
-- `POST /api/auth/refresh` - Refresh token
-
-### Menu (Public)
-- `GET /api/menu/categories` - Get all categories
-- `GET /api/menu/items` - Get all items
-- `GET /api/menu/items/:id` - Get item details
-
-### Menu (Admin)
-- `POST /api/menu/categories` - Create category
-- `POST /api/menu/items` - Create item
-- `POST /api/menu/items/upload-image` - Upload item image
-- `PUT /api/menu/items/:id` - Update item
-- `DELETE /api/menu/items/:id` - Delete item
-
-### Orders
-- `POST /api/orders` - Create order (instant or scheduled)
-- `GET /api/orders` - Get user orders
-- `GET /api/orders/:id` - Get order details
-- `PATCH /api/orders/:id/cancel` - Cancel order
-
-### Orders (Admin/Kitchen)
-- `GET /api/orders/admin/all` - Get all orders
-- `PATCH /api/orders/:id/status` - Update order status
-
-### Chat
-- `GET /api/chat/:orderId` - Get chat history
-- `POST /api/chat/:orderId` - Send message
-
-### Payments
-- `POST /api/payments/intent` - Create payment intent
-- `POST /api/payments/webhooks/stripe` - Stripe webhook
-- `POST /api/payments/webhooks/adyen` - Adyen webhook
-
-### Admin
-- `GET /api/admin/analytics/daily-sales` - Get analytics
-- `GET /api/admin/users` - Get all users
-- `GET /api/admin/chat/:orderId` - Get chat history
-
-### Delivery
-- `POST /api/delivery/tasks/:orderId` - Create delivery task
-- `PATCH /api/delivery/tasks/:orderId/assign` - Assign courier
-- `GET /api/delivery/tasks/my` - Get courier tasks
-
-### Health
-- `GET /api/health` - Health check
-- `GET /api/health/db` - Database health
-- `GET /api/health/redis` - Redis health
-
-## WebSocket Events
-
-### Order Events (namespace: `/orders`)
-- `join_order_room` - Join order room
-- `order_created` - Order created
-- `order_updated` - Order status updated
-- `order_cancelled` - Order cancelled
-- `order_ready` - Order ready
-- `order_delivering` - Order being delivered
-- `order_completed` - Order completed
-
-### Chat Events (namespace: `/chat`)
-- `join_chat_room` - Join chat room
-- `send_chat_message` - Send message
-- `request_chat_history` - Request chat history
-- `chat_message` - New message received
-- `chat_history` - Chat history response
-
-## Database Schema
-
-Key tables:
-- `users` - Customer accounts
-- `staff` - Staff members (admin, kitchen, courier)
-- `menu_categories` - Menu categories
-- `menu_items` - Menu items
-- `menu_modifiers` - Item modifiers
-- `orders` - Orders
-- `order_items` - Order items
-- `order_item_modifiers` - Order item modifiers
-- `payments` - Payment records
-- `chats` - Chat messages
-- `glovo_orders` - Glovo delivery orders
-- `delivery_tasks` - Internal delivery tasks
-- `addresses` - User delivery addresses
-- `order_status_history` - Order status audit trail
-
-## BullMQ Queues
-
-- `scheduledOrders` - Processes scheduled orders at exact time
-- `notifications` - Handles async notifications (email/SMS)
-- `glovoSync` - Syncs Glovo order status
-
-## Development
-
-### Running tests
+### Tests
 
 ```bash
-# Unit tests
-npm run test
-
-# E2E tests
-npm run test:e2e
-
-# Test coverage
-npm run test:cov
+npm test            # unit tests
+npm run test:e2e    # end-to-end tests (needs PostgreSQL and Redis)
+npm run test:cov    # coverage report
 ```
 
-### Code formatting
+## Project structure
 
-```bash
-npm run format
-npm run lint
-```
-
-### Database migrations
-
-```bash
-# Create migration
-npm run prisma:migrate
-
-# Reset database (dev only)
-npx prisma migrate reset
+```text
+src/
+├── main.ts          bootstrap, global prefix, Swagger
+├── config/          typed configuration and Joi validation
+├── database/        Prisma service, schema sync, first-run seeding
+├── modules/         auth, users, staff, menu, orders, chat, delivery,
+│                    glovo, payments, notifications, admin
+├── websockets/      /orders and /chat gateways
+├── queues/          BullMQ processors
+├── health/          health and readiness checks
+├── metrics/         Prometheus metrics
+└── common/          guards, decorators, filters, interceptors
+prisma/schema.prisma database schema
+test/                end-to-end tests
+docs/                setup and Render deployment guides
 ```
 
 ## Deployment
 
-### Docker
-
-```bash
-# Build image
-docker build -t cafeteria-burger-backend .
-
-# Run container
-docker run -p 3000:3000 --env-file .env cafeteria-burger-backend
-```
-
-### Render.com
-
-1. Connect your repository
-2. Set build command: `npm install && npm run prisma:generate && npm run build`
-3. Set start command: `npm run start:prod`
-4. Add environment variables
-5. Add PostgreSQL and Redis services
-6. Run migrations: `npx prisma migrate deploy`
-
-## Environment Variables
-
-See `.env.example` for all required variables.
-
-Key variables:
-- `DATABASE_URL` - PostgreSQL connection
-- `JWT_SECRET` - JWT signing secret
-- `REDIS_HOST`, `REDIS_PORT` - Redis connection
-- `FRONTEND_URL` - CORS origin
-- `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` - Stripe (placeholder)
-- `GLOVO_API_KEY`, `GLOVO_API_SECRET` - Glovo (placeholder)
-
-## Integration Notes
-
-### Payment Providers
-
-The payment module has placeholder implementations. To integrate:
-
-1. **Stripe**: Install `stripe` package and implement in `payments.service.ts`
-2. **Adyen**: Install Adyen SDK and implement in `payments.service.ts`
-3. Update webhook signature verification
-4. Test webhook endpoints
-
-### Glovo Integration
-
-The Glovo service is currently mocked. To integrate:
-
-1. Get Glovo API credentials
-2. Implement API calls in `glovo.service.ts`
-3. Set up webhook signature verification
-4. Map Glovo statuses to internal order statuses
-
-## Security
-
-- JWT authentication with refresh tokens
-- Role-based access control (RBAC)
-- Input validation with class-validator
-- SQL injection prevention (Prisma)
-- Webhook signature verification (to be implemented)
-- Rate limiting with @nestjs/throttler
-- Helmet for security headers
-- CORS configuration
-
-## Monitoring
-
-- Health check endpoints: `/api/health`, `/api/health/db`, `/api/health/redis`
-- Request/response logging
-- Error tracking
-- BullMQ queue monitoring
-
-## License
-
-MIT
-
-## Support
-
-For issues and questions, please open an issue on the repository.
+The repository includes a Dockerfile and a Render Blueprint (`render.yaml`) that provisions the API, PostgreSQL, and Redis. See [docs/RENDER_DEPLOYMENT.md](docs/RENDER_DEPLOYMENT.md) for the full guide and [docs/SETUP.md](docs/SETUP.md) for local setup.
