@@ -14,6 +14,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../database/prisma.service';
 import { NotificationsService } from '../modules/notifications/notifications.service';
 import { CurrentUserPayload } from '../common/decorators/current-user.decorator';
+import { SocketRateLimiter } from './socket-rate-limiter';
 
 @WebSocketGateway({
   cors: (origin, callback) => {
@@ -31,9 +32,7 @@ export class OrderGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private readonly allowedOrigins: string[];
   private readonly maxConnectionsPerUser = 5;
   private readonly userConnections = new Map<string, Set<string>>(); // userId -> Set of socketIds
-  private readonly connectionRateLimit = new Map<string, number>(); // socketId -> lastMessageTime
-  private readonly rateLimitWindow = 1000; // 1 second
-  private readonly maxMessagesPerWindow = 10;
+  private readonly rateLimiter = new SocketRateLimiter(10, 1000);
   private heartbeatInterval: NodeJS.Timeout | null = null;
 
   constructor(
@@ -64,16 +63,7 @@ export class OrderGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   private checkRateLimit(socketId: string): boolean {
-    const now = Date.now();
-    const lastMessage = this.connectionRateLimit.get(socketId) || 0;
-    const messagesInWindow = Math.floor((now - lastMessage) / this.rateLimitWindow);
-
-    if (messagesInWindow >= this.maxMessagesPerWindow) {
-      return false;
-    }
-
-    this.connectionRateLimit.set(socketId, now);
-    return true;
+    return this.rateLimiter.allow(socketId);
   }
 
   private checkConnectionLimit(userId: string, socketId: string): boolean {
@@ -169,7 +159,7 @@ export class OrderGateway implements OnGatewayConnection, OnGatewayDisconnect {
           this.userConnections.delete(user.id);
         }
       }
-      this.connectionRateLimit.delete(client.id);
+      this.rateLimiter.release(client.id);
     }
     this.logger.log(`Client ${client.id} disconnected`);
   }
