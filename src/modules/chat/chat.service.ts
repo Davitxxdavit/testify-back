@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { CurrentUserPayload } from '../../common/decorators/current-user.decorator';
+import { orderAccessWhere } from '../../common/utils/order-access';
 
 @Injectable()
 export class ChatService {
@@ -9,13 +10,7 @@ export class ChatService {
   async getChatHistory(orderId: string, userId?: string, isStaff: boolean = false) {
     // Verify access
     const order = await this.prisma.order.findFirst({
-      where: {
-        id: orderId,
-        OR: [
-          { userId },
-          ...(isStaff ? [{}] : []),
-        ],
-      },
+      where: orderAccessWhere(orderId, { id: userId, type: isStaff ? 'staff' : 'user' }),
     });
 
     if (!order) {
@@ -43,13 +38,7 @@ export class ChatService {
   ) {
     // Verify access
     const order = await this.prisma.order.findFirst({
-      where: {
-        id: orderId,
-        OR: [
-          { userId: user.id },
-          ...(user.type === 'staff' ? [{}] : []),
-        ],
-      },
+      where: orderAccessWhere(orderId, user),
     });
 
     if (!order) {

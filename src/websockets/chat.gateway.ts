@@ -15,6 +15,7 @@ import { PrismaService } from '../database/prisma.service';
 import { NotificationsService } from '../modules/notifications/notifications.service';
 import { CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import { SocketRateLimiter } from './socket-rate-limiter';
+import { orderAccessWhere } from '../common/utils/order-access';
 
 @WebSocketGateway({
   cors: (origin, callback) => {
@@ -179,13 +180,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     // Verify user has access to this order
     const order = await this.prisma.order.findFirst({
-      where: {
-        id: data.orderId,
-        OR: [
-          { userId: user.id },
-          ...(user.type === 'staff' ? [{}] : []),
-        ],
-      },
+      where: orderAccessWhere(data.orderId, user),
     });
 
     if (!order) {
@@ -231,13 +226,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     const order = await this.prisma.order.findFirst({
-      where: {
-        id: data.orderId,
-        OR: [
-          { userId: user.id },
-          ...(user.type === 'staff' ? [{}] : []),
-        ],
-      },
+      where: orderAccessWhere(data.orderId, user),
     });
 
     if (!order) {
@@ -263,13 +252,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     const order = await this.prisma.order.findFirst({
-      where: {
-        id: data.orderId,
-        OR: [
-          { userId: user.id },
-          ...(user.type === 'staff' ? [{}] : []),
-        ],
-      },
+      where: orderAccessWhere(data.orderId, user),
     });
 
     if (!order) {
