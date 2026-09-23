@@ -22,7 +22,16 @@ export class OrdersService {
   ) {}
 
   async create(userId: string, createOrderDto: CreateOrderDto) {
-    const { type, scheduledFor, items, deliveryType, addressId } = createOrderDto;
+    const {
+      type,
+      scheduledFor,
+      items,
+      deliveryType,
+      addressId,
+      paymentMethod,
+      contactPhone,
+      notes,
+    } = createOrderDto;
 
     // Validate scheduled time
     if (type === OrderType.SCHEDULED) {
@@ -83,6 +92,9 @@ export class OrdersService {
           scheduledFor: scheduledFor ? new Date(scheduledFor) : null,
           deliveryType,
           addressId,
+          paymentMethod,
+          contactPhone,
+          notes,
           totalPrice,
           status: type === OrderType.SCHEDULED ? OrderStatus.PENDING : OrderStatus.PENDING,
           paymentStatus: PaymentStatus.PENDING,

@@ -50,6 +50,11 @@ enum DeliveryTaskStatus {
   DONE
 }
 
+enum PaymentMethod {
+  CASH
+  CARD
+}
+
 enum PaymentProvider {
   STRIPE
   ADYEN
@@ -173,6 +178,9 @@ model Order {
   deliveryType  DeliveryType  @map("delivery_type")
   totalPrice    Decimal       @db.Decimal(10, 2) @map("total_price")
   addressId     String?       @map("address_id")
+  paymentMethod PaymentMethod @default(CASH) @map("payment_method")
+  contactPhone  String?       @map("contact_phone")
+  notes         String?
   createdAt     DateTime      @default(now()) @map("created_at")
   updatedAt     DateTime      @updatedAt @map("updated_at")
 

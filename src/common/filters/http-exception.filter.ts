@@ -28,7 +28,8 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const requestId = (request as any).id || request.headers['x-request-id'] || 'unknown';
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
-    let message = 'Internal server error';
+    // ValidationPipe errors carry a string[] (one entry per failed constraint)
+    let message: string | string[] = 'Internal server error';
     let error = 'Internal Server Error';
     let stack: string | undefined;
 
@@ -48,7 +49,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
     }
 
     // Sanitize sensitive data from message
-    message = this.sanitizeMessage(message);
+    message = Array.isArray(message)
+      ? message.map((m) => this.sanitizeMessage(String(m)))
+      : this.sanitizeMessage(String(message));
 
     const errorResponse: any = {
       statusCode: status,
